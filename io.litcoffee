@@ -116,59 +116,17 @@ Event handlers
       handlers[method] = callback
 
 
-    class Port
-     constructor: ->
-      @handlers = {}
-      @callsCache = {}
-      @callsCounter = 0
-
-     send: (method, data, callbacks) -> null
-
-     addHandler: (method, callback) ->
-      @handlers[method] = callback
-
-     handleMessage: (data) ->
-      if data.type is 'response'
-       return unless @callsCache[data.id]?
-       @callsCache[data.id].handle data
-      else if data.type is 'call'
-       return unless @handlers[data.method]?
-       @handlers[data.method] data.data, new Response data, this
-
-     respond: (id, status, data, progress) -> null
-
-    class WorkerPort extends Port
-     constructor: (js) ->
-      @worker = new Worker js
-      @worker.onmessage = @onMessage
-      @worker.onerror = @onError
-      super()
-
-     send: (method, data, callbacks) -> null
-      if (typeof callbacks) is 'function'
-       callbacks =
-        success: callbacks
-
-      call = new Call method, data, callbacks
-      @callsCache[call.id] = call
-      @worker.postMessage
-       type: 'call'
-       id: call.id
-       mehtod: call.method
-       data: call.data
-
-
     class Response
      constructor: (data, port) ->
       @id = data.id
       @port = port
 
      progress: (progress, data) ->
-      @port.respond @id, 'progress', data, progress
+      @port.respond this, 'progress', data, progress: progress
      success: (data) ->
-      @port.respond @id, 'success', data
+      @port.respond this, 'success', data
      fail: (data) ->
-      @port.respond @id, 'fail', data
+      @port.respond this, 'fail', data
 
     IO =
      addPort: (name, port) ->
