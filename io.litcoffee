@@ -1,120 +1,4 @@
-Incoming calls
-
-    callCache = {}
-    callCounter = 0
-
-Event handlers
-
-    handlers = {}
-
-    getCallId = ->
-     callCounter++
-     return callCounter
-
-    defaultHTTPHandler = (req, res) ->
-     res.writeHead 200
-     res.end "Hello, world!"
-
-    EngineSocket = null
-
-    class SocketResponse
-     constructor: (data) ->
-      @id = data.id
-
-     progress: (progress, data) ->
-      EngineSocket.emit 'message',
-       type: 'response'
-       id: @id
-       status: 'progress'
-       progress: progress
-       data: data
-
-     success: (data) ->
-      EngineSocket.emit 'message',
-       type: 'response'
-       id: @id
-       status: 'success'
-       data: data
-
-     fail: (data) ->
-      EngineSocket.emit 'message',
-       type: 'response'
-       id: @id
-       status: 'fail'
-       data: data
-
-    EngineWorker = null
-    class WorkerResponse
-     constructor: (data) ->
-      @id = data.id
-
-     progress: (progress, data) ->
-      EngineWorker.postMessage
-       type: 'response'
-       id: @id
-       status: 'progress'
-       progress: progress
-       data: data
-
-     success: (data) ->
-      EngineWorker.postMessage
-       type: 'response'
-       id: @id
-       status: 'success'
-       data: data
-
-     fail: (data) ->
-      EngineWorker.postMessage
-       type: 'response'
-       id: @id
-       status: 'fail'
-       data: data
-
-    onWorkerMessage = (e) ->
-     if e.data.type is 'response'
-      return unless callCache[e.data.id]?
-
-      callCache[e.data.id].handle e.data
-     else if e.data.type is 'call'
-      return unless (typeof handlers[e.data.method]) is 'function'
-
-      res = new WorkerResponse e.data
-      handlers[e.data.method] e.data.data, res
-
-
-    class EngineCall
-     constructor: (@method, @data, @callbacks) ->
-      @id = getCallId()
-
-     handle: (data) ->
-      @callbacks[data.status]? data
-
-
-     send: (method, data, callbacks) ->
-      if (typeof callbacks) is 'function'
-       callbacks =
-        success: callbacks
-
-      call = new EngineCall method, data, callbacks
-      callCache[call.id] = call
-
-      if EngineWorker?
-       EngineWorker.postMessage
-        type: 'call'
-        id: call.id
-        method: call.method
-        data: call.data
-      else if EngineSocket?
-       EngineSocket.emit 'message',
-        type: 'call'
-        id: call.id
-        method: call.method
-        data: call.data
-
-
-     addHandler: (method, callback) ->
-      handlers[method] = callback
-
+    _self = this
 
     class Response
      constructor: (data, port) ->
@@ -128,9 +12,103 @@ Event handlers
      fail: (data) ->
       @port.respond this, 'fail', data
 
+    class Call
+     constructor: (@id, @method, @data, @callbacks) -> null
+
+     handle: (data) ->
+      if not @callbacks[data.status]?
+       throw new Error "No callback registered #{@method} #{data.status}"
+      @callback[data.status] data
+
+    class Port
+     constructor: ->
+      @handlers = {}
+      @callsCache = {}
+      @callsCounter = 0
+
+     send: (method, data, callbacks, options = {}) -> null
+      @_send @_createCall method, data, callbacks, options
+
+     respond: (response, status, data, options = {}) ->
+      @_respond @_createRespose response, status, data, options
+
+
+     _createCall: (method, data, callbacks, options) ->
+      #TODO other params via options
+      if (typeof callbacks) is 'function'
+       callbacks =
+        success: callbacks
+
+      call = new Call @callsCounter, method, data, callbacks
+      @callsCounter++
+      @callsCache[call.id] = call
+
+      params =
+       type: 'call'
+       id: call.id
+       mehtod: call.method
+       data: call.data
+
+      return params
+
+     _createRespose: (response, status, data, options) ->
+      params =
+       type: 'response'
+       id: response.id
+       status: status
+       data: data
+
+      params[k] = v for k, v of options
+
+      return params
+
+     addHandler: (method, callback) ->
+      @handlers[method] = callback
+
+     handleMessage: (data) ->
+      if data.type is 'response'
+       return unless @callsCache[data.id]?
+       @callsCache[data.id].handle data
+      else if data.type is 'call'
+       return unless @handlers[data.method]?
+       @handlers[data.method] data.data, new Response data, this
+
+    class WorkerPort extends Port
+     constructor: (worker) ->
+      @worker = worker
+      @worker.onmessage = @_onMessage.bind this
+      @worker.onerror = @_onError.bind this
+      super()
+
+     _send: (data) ->  @worker.postMessage data
+     _respond: (data) -> @worker.postMessage data
+
+     _onMessage: (e) ->
+      data = e.data
+      @handleMessage data
+
+     _onError: (e) -> console.log e
+
+    class SocketPort extends Port
+     constructor: (socket) ->
+      @socket = socket
+      @socket.on 'message', @_onMessage.bind this
+      super()
+
+     _send: (data) ->  @socket.emit 'message', data
+     _respond: (data) -> @worker.emit 'message', data
+
+     _onMessage: (e) ->
+      data = e.data
+      @handleMessage data
+
     IO =
      addPort: (name, port) ->
       IO[name] = port
+
+     ports:
+      WorkerPort: WorkerPort
+      SocketPort: SocketPort
 
      setup: (options) ->
       options.workers ?= []

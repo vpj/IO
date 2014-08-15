@@ -5,6 +5,10 @@
       @callsCounter = 0
 
      send: (method, data, callbacks, options = {}) -> null
+      @_send @_createCall method, data, callbacks, options
+
+     respond: (response, status, data, options = {}) ->
+      @_respond @_createRespose response, status, data, options
 
 
      _createCall: (method, data, callbacks, options) ->
@@ -13,7 +17,8 @@
        callbacks =
         success: callbacks
 
-      call = new Call method, data, callbacks
+      call = new Call @callsCounter, method, data, callbacks
+      @callsCounter++
       @callsCache[call.id] = call
 
       params =
@@ -46,20 +51,32 @@
        return unless @handlers[data.method]?
        @handlers[data.method] data.data, new Response data, this
 
-     respond: (id, status, data, progress) -> null
-
     class WorkerPort extends Port
-     constructor: (js) ->
-      @worker = new Worker js
-      @worker.onmessage = @onMessage
-      @worker.onerror = @onError
+     constructor: (worker) ->
+      @worker = worker
+      @worker.onmessage = @_onMessage.bind this
+      @worker.onerror = @_onError.bind this
       super()
 
-     send: (method, data, callbacks, options = {}) ->
-      @worker.postMessage @_createCall method, data, callbacks, options
+     _send: (data) ->  @worker.postMessage data
+     _respond: (data) -> @worker.postMessage data
 
-     respond: (response, status, data, options = {}) ->
-      @worker.postMessage @_createRespose response, status, data, options
+     _onMessage: (e) ->
+      data = e.data
+      @handleMessage data
 
+     _onError: (e) -> console.log e
 
+    class SocketPort extends Port
+     constructor: (socket) ->
+      @socket = socket
+      @socket.on 'message', @_onMessage.bind this
+      super()
+
+     _send: (data) ->  @socket.emit 'message', data
+     _respond: (data) -> @worker.emit 'message', data
+
+     _onMessage: (e) ->
+      data = e.data
+      @handleMessage data
 
