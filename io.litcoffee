@@ -21,12 +21,12 @@
       @callback[data.status] data
 
     class Port
-     constructor: ->
-      @handlers = {}
+     constructor: (options = {}) ->
+      @handlers = options.handlers ? {}
       @callsCache = {}
       @callsCounter = 0
 
-     send: (method, data, callbacks, options = {}) -> null
+     send: (method, data, callbacks, options = {}) ->
       @_send @_createCall method, data, callbacks, options
 
      respond: (response, status, data, options = {}) ->
@@ -74,11 +74,11 @@
        @handlers[data.method] data.data, new Response data, this
 
     class WorkerPort extends Port
-     constructor: (worker) ->
+     constructor: (options, worker) ->
+      super options
       @worker = worker
       @worker.onmessage = @_onMessage.bind this
       @worker.onerror = @_onError.bind this
-      super()
 
      _send: (data) ->  @worker.postMessage data
      _respond: (data) -> @worker.postMessage data
@@ -90,10 +90,10 @@
      _onError: (e) -> console.log e
 
     class SocketPort extends Port
-     constructor: (socket) ->
+     constructor: (options, socket) ->
+      super options
       @socket = socket
       @socket.on 'message', @_onMessage.bind this
-      super()
 
      _send: (data) ->  @socket.emit 'message', data
      _respond: (data) -> @worker.emit 'message', data
@@ -102,6 +102,16 @@
       data = e.data
       @handleMessage data
 
+    class ServerSocketPort extends Port
+     constructor: (options, server) ->
+      super options
+      @server = server
+      @server.on 'connection', @_onConnection.bind this
+
+     _onConnection: (socket) ->
+      new SocketPort handlers: @handlers, socket
+
+
     IO =
      addPort: (name, port) ->
       IO[name] = port
@@ -109,6 +119,7 @@
      ports:
       WorkerPort: WorkerPort
       SocketPort: SocketPort
+      ServerSocketPort: ServerSocketPort
 
      setup: (options) ->
       options.workers ?= []
