@@ -50,3 +50,12 @@
      handleCall: SingleSession.handleCall
      handleResponse: SingleSession.handleResponse
 
+    if exports?
+     exports.SingleSession = SingleSession
+     exports.MultiSession = MultiSession
+    else
+     _self.IO ?= {}
+     _self.IO.wrappers ?= {}
+     _self.IO.wrappers.SingleSession = SingleSession
+     _self.IO.wrappers.MultiSession = MultiSession
+

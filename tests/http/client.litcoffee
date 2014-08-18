@@ -1,6 +1,6 @@
 #!/usr/bin/env coffee
 
-    IO = require '../io'
+    IO = require '../../io'
     http = require 'http'
 
     options =
