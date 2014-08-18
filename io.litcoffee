@@ -1,5 +1,7 @@
     _self = this
 
+##Response class
+
     class Response
      constructor: (data, port) ->
       @id = data.id
@@ -7,10 +9,16 @@
 
      progress: (progress, data) ->
       @port.respond this, 'progress', data, progress: progress
+
      success: (data) ->
       @port.respond this, 'success', data
+
      fail: (data) ->
       @port.respond this, 'fail', data
+
+
+
+##Call class
 
     class Call
      constructor: (@id, @method, @data, @callbacks) -> null
@@ -20,18 +28,27 @@
        throw new Error "No callback registered #{@method} #{data.status}"
       @callback[data.status] data
 
+##Port base class
+
     class Port
      constructor: (options = {}) ->
       @handlers = options.handlers ? {}
       @callsCache = {}
       @callsCounter = 0
 
+###Send RPC call
+
      send: (method, data, callbacks, options = {}) ->
       @_send @_createCall method, data, callbacks, options
+
+###Respond to a RPC call
 
      respond: (response, status, data, options = {}) ->
       @_respond @_createRespose response, status, data, options
 
+
+###Create Call object
+This is a private function
 
      _createCall: (method, data, callbacks, options) ->
       #TODO other params via options
@@ -51,6 +68,8 @@
 
       return params
 
+###Create Response object
+
      _createRespose: (response, status, data, options) ->
       params =
        type: 'response'
@@ -62,8 +81,12 @@
 
       return params
 
+###Add handler
+
      addHandler: (method, callback) ->
       @handlers[method] = callback
+
+###Handle incoming message
 
      handleMessage: (data) ->
       if data.type is 'response'
@@ -72,6 +95,11 @@
       else if data.type is 'call'
        return unless @handlers[data.method]?
        @handlers[data.method] data.data, new Response data, this
+
+
+
+##WorkerPort class
+Used for browser and worker
 
     class WorkerPort extends Port
      constructor: (options, worker) ->
@@ -89,6 +117,10 @@
 
      _onError: (e) -> console.log e
 
+
+
+##SocketPort class
+
     class SocketPort extends Port
      constructor: (options, socket) ->
       super options
@@ -102,6 +134,10 @@
       data = e.data
       @handleMessage data
 
+
+
+##ServerSocketPort class
+
     class ServerSocketPort extends Port
      constructor: (options, server) ->
       super options
@@ -112,6 +148,51 @@
       new SocketPort handlers: @handlers, socket
 
 
+
+##NodeHttpPort class
+
+    class NodeHttpPort extends Port
+     constructor: (options, http) ->
+      super options
+      @host = options.host ? 'localhost'
+      @port = options.port ? 80
+      @path = options.path ? '/'
+      @http = http
+      @_createHttpOptions()
+
+     _createHttpOptions: ->
+      @httpOptions =
+       hostname: @host
+       port: @port
+       path: @path
+       method: 'POST'
+       headers:
+        accept: 'application/json'
+
+     _send: (data) ->
+      data = JSON.stringify data
+      options = @httpOptions
+      options.headers['content-length'] = data.length
+
+      req = @http.request options, (res) =>
+       console.log 'STATUS: ' + res.statusCode
+       console.log 'HEADERS: ' + JSON.stringify res.headers
+       res.setEncoding 'utf8'
+       res.on 'data', (chunk) ->
+        console.log 'BODY: ' + chunk
+       #console.log 'result', res
+
+      delete options.headers['content-length']
+      req.on 'error', (e) ->
+       console.log 'error', e
+
+      req.write data
+      req.end()
+
+
+
+#IO Module
+
     IO =
      addPort: (name, port) ->
       IO[name] = port
@@ -119,6 +200,7 @@
      ports:
       WorkerPort: WorkerPort
       SocketPort: SocketPort
+      NodeHttpPort: NodeHttpPort
       ServerSocketPort: ServerSocketPort
 
      setup: (options) ->
