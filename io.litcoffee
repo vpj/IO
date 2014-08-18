@@ -36,10 +36,24 @@
       @handlers = {}
       @callsCache = {}
       @callsCounter = 0
+      @wrappers =
+       send: []
+       respond: []
+       handleCall: []
+       handleRespose: []
+
+     wrap: (wrapper) ->
+
+
+
 
 ###Send RPC call
 
      send: (method, data, callbacks, options = {}) ->
+      if (typeof callbacks) is 'function'
+       callbacks =
+        success: callbacks
+
       @_send @_createCall method, data, callbacks, options
 
 ###Respond to a RPC call
@@ -52,10 +66,6 @@
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
-      if (typeof callbacks) is 'function'
-       callbacks =
-        success: callbacks
-
       call = new Call @callsCounter, method, data, callbacks
       @callsCounter++
       @callsCache[call.id] = call
@@ -84,20 +94,25 @@ This is a private function
 
 ###Add handler
 
-     addHandler: (method, callback) ->
+     on: (method, callback) ->
       @handlers[method] = callback
 
 ###Handle incoming message
 
-     handleMessage: (data, options) ->
-      if data.type is 'response'
-       return unless @callsCache[data.id]?
-       @callsCache[data.id].handle data
-      else if data.type is 'call'
-       return unless @handlers[data.method]?
-       @handlers[data.method] data.data, new Response data, this, options
+     _handleMessage: (data, options) ->
+      switch data.type
+       when 'response'
+        @_handleResponse data, options
+       when 'call'
+        @_handleCall data, options
 
+     _handleCall: (data, options)
+      return unless @handlers[data.method]?
+      @handlers[data.method] data.data, new Response data, this, options
 
+     _handleResponse: (data, options) ->
+      return unless @callsCache[data.id]?
+      @callsCache[data.id].handle data
 
 ##WorkerPort class
 Used for browser and worker
@@ -114,7 +129,7 @@ Used for browser and worker
 
      _onMessage: (e) ->
       data = e.data
-      @handleMessage data
+      @_handleMessage data
 
      _onError: (e) -> console.log e
 
@@ -133,7 +148,7 @@ Used for browser and worker
 
      _onMessage: (e) ->
       data = e.data
-      @handleMessage data
+      @_handleMessage data
 
 
 
@@ -187,7 +202,7 @@ Used for browser and worker
         console.log 'ParseError', e
         return
 
-       @handleMessage jsonData, response: res
+       @_handleMessage jsonData, response: res
 
      _respond: (data, options) ->
       data = JSON.stringify data
@@ -233,7 +248,7 @@ Used for browser and worker
         console.log 'ParseError', e
         return
 
-       @handleMessage jsonData, response: res
+       @_handleMessage jsonData, response: res
 
      _respond: (data, options) ->
       data = JSON.stringify data
