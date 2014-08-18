@@ -3,18 +3,19 @@
 ##Response class
 
     class Response
-     constructor: (data, port) ->
+     constructor: (data, port, options) ->
       @id = data.id
       @port = port
+      @options = options
 
      progress: (progress, data) ->
-      @port.respond this, 'progress', data, progress: progress
+      @port.respond this, 'progress', data, progress: progress, @options
 
      success: (data) ->
-      @port.respond this, 'success', data
+      @port.respond this, 'success', data, {}, @options
 
      fail: (data) ->
-      @port.respond this, 'fail', data
+      @port.respond this, 'fail', data, {}, @options
 
 
 
@@ -43,8 +44,8 @@
 
 ###Respond to a RPC call
 
-     respond: (response, status, data, options = {}) ->
-      @_respond @_createRespose response, status, data, options
+     respond: (response, status, data, options = {}, portOptions = {}) ->
+      @_respond (@_createRespose response, status, data, options), portOptions
 
 
 ###Create Call object
@@ -88,13 +89,13 @@ This is a private function
 
 ###Handle incoming message
 
-     handleMessage: (data) ->
+     handleMessage: (data, options) ->
       if data.type is 'response'
        return unless @callsCache[data.id]?
        @callsCache[data.id].handle data
       else if data.type is 'call'
        return unless @handlers[data.method]?
-       @handlers[data.method] data.data, new Response data, this
+       @handlers[data.method] data.data, new Response data, this, options
 
 
 
@@ -168,6 +169,8 @@ Used for browser and worker
        method: 'POST'
        headers:
         accept: 'application/json'
+       'content-type': 'application/json'
+
 
      _send: (data) ->
       data = JSON.stringify data
@@ -191,6 +194,42 @@ Used for browser and worker
 
 
 
+##NodeHttpServerPort class
+
+    class NodeHttpServerPort extends Port
+     constructor: (options, http) ->
+      super options
+      @port = options.port
+      @http = http
+
+     _onRequest: (req, res) ->
+      data = ''
+      res.setHeader 'content-type', 'application/json'
+
+      req.on 'data', (chunk) ->
+       data += chunk
+      req.on 'end', =>
+       try
+        jsonData = JSON.parse data
+       catch e
+        console.log 'ParseError', e
+        return
+
+       console.log jsonData
+       @handleMessage jsonData, response: res
+
+     _respond: (data, options) ->
+      data = JSON.stringify data
+      res = options.response
+      res.setHeader 'content-length', data.length
+      res.write data
+      res.end()
+
+     listen: ->
+      @server = @http.createServer @_onRequest.bind this
+      @server.listen @port
+
+
 #IO Module
 
     IO =
@@ -201,6 +240,7 @@ Used for browser and worker
       WorkerPort: WorkerPort
       SocketPort: SocketPort
       NodeHttpPort: NodeHttpPort
+      NodeHttpServerPort: NodeHttpServerPort
       ServerSocketPort: ServerSocketPort
 
      setup: (options) ->
