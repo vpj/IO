@@ -1,40 +1,52 @@
-    class Session
-     constructor: (port) ->
-      @port = port
-      @addHandler = @port.addHandler.bind
-      @portFunctions =
-       _handleCall: @port._handleCall.bind @port
-       _handleResponse: @port._handleResponse.bind @port
-
-      @port._handleCall = @_handleCall.bind this
-      @port._handleResponse = @_handleRespose.bind this
-
-      @on = @port.on.bind @port
-      @onerror = @port.onerror
-
-      @session = null
-
-     send: (method, data, callback, options = {}) ->
+    SingleSession =
+     session: null
+     send: (method, data, callback, options) ->
       options.session = @session
-      @port.send method, data, callback, options
+      return true
 
-     respond: (response, status, data, options = {}, portOptions = {}) ->
-      options.session = @session
-      @port.respond respond, status, data, options, portOptions
+     respond: (response, status, data, options, portOptions) ->
+      if not portOptions.session?
+       throw new Error 'RPC without session'
 
-     _handleCall: (data, options) ->
-      if data.method is 'createSession'
-       res = new Response data, this, options
-       return
+      options.session = portOptions.session
+      return true
 
-      if data.session?
-       @portFunctions._handleCall data, options
-       return
+     handleCall: (data, options) ->
+      if data.method is 'newSession'
+       @session = Math.random() * 1000 // 1000
+       options.session = @session
+       @respond id: data.id, 'success', 'newSession', {}, options
+       return false
 
-      if @onerror?
+      if not data.session?
        @onerror 'RPC without session', data: data
+       return false
 
-      return
+      options.session = data.session
+      return true
 
-     createSession: ->
+     handleResponse: (data, options) ->
+      if not data.session?
+       @onerror 'RPC without session', data: data
+       return false
+
+      return true
+
+     _onSession: (data, options) ->
+      @session = options.session
+      @onSession? @session
+
+     createSession: (callback) ->
+      @onSession = callback
+      @send 'newSession', null, (@_onSession.bind this)
+
+
+    MultiSession =
+     session: null
+     send: ->
+      throw new Error 'MultiSession port cannot send messages'
+      return false
+
+     handleCall: SingleSession.handleCall
+     handleResponse: SingleSession.handleResponse
 

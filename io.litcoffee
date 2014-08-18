@@ -24,10 +24,10 @@
     class Call
      constructor: (@id, @method, @data, @callbacks) -> null
 
-     handle: (data) ->
-      if not @callbacks[data.status]?
-       throw new Error "No callback registered #{@method} #{data.status}"
-      @callbacks[data.status] data
+     handle: (data, options) ->
+      if not @callbacks[options.status]?
+       throw new Error "No callback registered #{@method} #{options.status}"
+      @callbacks[options.status] data, options
 
 ##Port base class
 
@@ -40,12 +40,14 @@
        send: []
        respond: []
        handleCall: []
-       handleRespose: []
+       handleResponse: []
 
      wrap: (wrapper) ->
-
-
-
+      for key, f of wrapper
+       if @wrappers[key]?
+        @wrappers[key].push f
+       else
+        this[key] = f
 
 ###Send RPC call
 
@@ -54,12 +56,18 @@
        callbacks =
         success: callbacks
 
+      for f in @wrappers.send
+       return unless f.apply this, arguments
+
       @_send @_createCall method, data, callbacks, options
 
 ###Respond to a RPC call
 
      respond: (response, status, data, options = {}, portOptions = {}) ->
-      @_respond (@_createRespose response, status, data, options), portOptions
+      for f in @wrappers.respond
+       return unless f.apply this, arguments
+
+      @_respond (@_createResponse response, status, data, options), portOptions
 
 
 ###Create Call object
@@ -81,7 +89,7 @@ This is a private function
 
 ###Create Response object
 
-     _createRespose: (response, status, data, options) ->
+     _createResponse: (response, status, data, options) ->
       params =
        type: 'response'
        id: response.id
@@ -106,13 +114,17 @@ This is a private function
        when 'call'
         @_handleCall data, options
 
-     _handleCall: (data, options)
+     _handleCall: (data, options) ->
+      for f in @wrappers.handleCall
+       return unless f.apply this, arguments
       return unless @handlers[data.method]?
       @handlers[data.method] data.data, new Response data, this, options
 
      _handleResponse: (data, options) ->
+      for f in @wrappers.handleResponse
+       return unless f.apply this, arguments
       return unless @callsCache[data.id]?
-      @callsCache[data.id].handle data
+      @callsCache[data.id].handle data.data, data
 
 ##WorkerPort class
 Used for browser and worker
