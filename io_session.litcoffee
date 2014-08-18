@@ -13,13 +13,14 @@
 
      handleCall: (data, options) ->
       if data.method is 'newSession'
-       @session = Math.random() * 1000 // 1000
+       @session = Math.random() * 1000 // 1
        options.session = @session
        @respond id: data.id, 'success', 'newSession', {}, options
        return false
 
       if not data.session?
-       @onerror 'RPC without session', data: data
+       @onerror? 'RPC without session', data: data
+       @respond id: data.id, 'fail', 'newSession', {}, options
        return false
 
       options.session = data.session
@@ -27,7 +28,7 @@
 
      handleResponse: (data, options) ->
       if not data.session?
-       @onerror 'RPC without session', data: data
+       @onerror? 'RPC without session', data: data
        return false
 
       return true
@@ -36,7 +37,7 @@
       @session = options.session
       @onSession? @session
 
-     createSession: (callback) ->
+     newSession: (callback) ->
       @onSession = callback
       @send 'newSession', null, (@_onSession.bind this)
 
@@ -46,6 +47,7 @@
      send: ->
       throw new Error 'MultiSession port cannot send messages'
       return false
+     respond: SingleSession.respond
 
      handleCall: SingleSession.handleCall
      handleResponse: SingleSession.handleResponse

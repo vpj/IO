@@ -42,6 +42,9 @@
        handleCall: []
        handleResponse: []
 
+     onerror: (msg, options) ->
+      console.log msg, options
+
      wrap: (wrapper) ->
       for key, f of wrapper
        if @wrappers[key]?
@@ -57,7 +60,7 @@
         success: callbacks
 
       for f in @wrappers.send
-       return unless f.apply this, arguments
+       return unless f.apply this, [method, data, callbacks, options]
 
       @_send @_createCall method, data, callbacks, options
 
@@ -65,7 +68,7 @@
 
      respond: (response, status, data, options = {}, portOptions = {}) ->
       for f in @wrappers.respond
-       return unless f.apply this, arguments
+       return unless f.apply this, [response, status, data, options, portOptions]
 
       @_respond (@_createResponse response, status, data, options), portOptions
 
