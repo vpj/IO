@@ -27,13 +27,13 @@
      handle: (data) ->
       if not @callbacks[data.status]?
        throw new Error "No callback registered #{@method} #{data.status}"
-      @callback[data.status] data
+      @callbacks[data.status] data
 
 ##Port base class
 
     class Port
-     constructor: (options = {}) ->
-      @handlers = options.handlers ? {}
+     constructor: ->
+      @handlers = {}
       @callsCache = {}
       @callsCounter = 0
 
@@ -52,7 +52,6 @@
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
-      #TODO other params via options
       if (typeof callbacks) is 'function'
        callbacks =
         success: callbacks
@@ -64,9 +63,10 @@ This is a private function
       params =
        type: 'call'
        id: call.id
-       mehtod: call.method
+       method: call.method
        data: call.data
 
+      params[k] = v for k, v of options
       return params
 
 ###Create Response object
@@ -103,8 +103,8 @@ This is a private function
 Used for browser and worker
 
     class WorkerPort extends Port
-     constructor: (options, worker) ->
-      super options
+     constructor: (worker) ->
+      super()
       @worker = worker
       @worker.onmessage = @_onMessage.bind this
       @worker.onerror = @_onError.bind this
@@ -123,8 +123,8 @@ Used for browser and worker
 ##SocketPort class
 
     class SocketPort extends Port
-     constructor: (options, socket) ->
-      super options
+     constructor: (socket) ->
+      super()
       @socket = socket
       @socket.on 'message', @_onMessage.bind this
 
@@ -140,8 +140,8 @@ Used for browser and worker
 ##ServerSocketPort class
 
     class ServerSocketPort extends Port
-     constructor: (options, server) ->
-      super options
+     constructor: (server) ->
+      super()
       @server = server
       @server.on 'connection', @_onConnection.bind this
 
@@ -154,7 +154,7 @@ Used for browser and worker
 
     class NodeHttpPort extends Port
      constructor: (options, http) ->
-      super options
+      super()
       @host = options.host ? 'localhost'
       @port = options.port ? 80
       @path = options.path ? '/'
@@ -172,19 +172,37 @@ Used for browser and worker
        'content-type': 'application/json'
 
 
+     _onRequest: (res) ->
+      data = ''
+      #console.log 'STATUS: ' + res.statusCode
+      #console.log 'HEADERS: ' + JSON.stringify res.headers
+      res.setEncoding 'utf8'
+      res.on 'data', (chunk) ->
+       data += chunk
+      #console.log 'result', res
+      res.on 'end', =>
+       try
+        jsonData = JSON.parse data
+       catch e
+        console.log 'ParseError', e
+        return
+
+       @handleMessage jsonData, response: res
+
+     _respond: (data, options) ->
+      data = JSON.stringify data
+      res = options.response
+      res.setHeader 'content-length', data.length
+      res.write data
+      res.end()
+
+
      _send: (data) ->
       data = JSON.stringify data
       options = @httpOptions
       options.headers['content-length'] = data.length
 
-      req = @http.request options, (res) =>
-       console.log 'STATUS: ' + res.statusCode
-       console.log 'HEADERS: ' + JSON.stringify res.headers
-       res.setEncoding 'utf8'
-       res.on 'data', (chunk) ->
-        console.log 'BODY: ' + chunk
-       #console.log 'result', res
-
+      req = @http.request options, @_onRequest.bind this
       delete options.headers['content-length']
       req.on 'error', (e) ->
        console.log 'error', e
@@ -198,7 +216,7 @@ Used for browser and worker
 
     class NodeHttpServerPort extends Port
      constructor: (options, http) ->
-      super options
+      super()
       @port = options.port
       @http = http
 
@@ -215,7 +233,6 @@ Used for browser and worker
         console.log 'ParseError', e
         return
 
-       console.log jsonData
        @handleMessage jsonData, response: res
 
      _respond: (data, options) ->
