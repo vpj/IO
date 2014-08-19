@@ -9,7 +9,7 @@
 
     server.listen()
 
-    IO.Client.on 'echo', (data, res) ->
+    IO.Client.on 'echo', (data, options, res) ->
      console.log data
      res.success 'World listening...'
 

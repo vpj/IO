@@ -121,7 +121,7 @@ This is a private function
       for f in @wrappers.handleCall
        return unless f.apply this, arguments
       return unless @handlers[data.method]?
-      @handlers[data.method] data.data, new Response data, this, options
+      @handlers[data.method] data.data, data, new Response data, this, options
 
      _handleResponse: (data, options) ->
       for f in @wrappers.handleResponse
