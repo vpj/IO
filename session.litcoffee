@@ -1,3 +1,5 @@
+    _self = this
+
     SingleSession =
      session: null
      send: (method, data, callback, options) ->
