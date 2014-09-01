@@ -120,13 +120,15 @@ This is a private function
      _handleCall: (data, options) ->
       for f in @wrappers.handleCall
        return unless f.apply this, arguments
-      return unless @handlers[data.method]?
+      if not @handlers[data.method]?
+       throw new Error "Unknown method: #{data.method}"
       @handlers[data.method] data.data, data, new Response data, this, options
 
      _handleResponse: (data, options) ->
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
-      return unless @callsCache[data.id]?
+      if not @callsCache[data.id]?
+       throw new Error "Response without call: #{data.id}"
       @callsCache[data.id].handle data.data, data
 
 ##WorkerPort class
