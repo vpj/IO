@@ -26,6 +26,7 @@
 
      handle: (data, options) ->
       if not @callbacks[options.status]?
+       return if options.status is 'progress'
        throw new Error "No callback registered #{@method} #{options.status}"
       @callbacks[options.status] data, options
 
