@@ -1,5 +1,8 @@
     _self = this
 
+    POLL_TYPE =
+     progress: true
+
 ##Response class
 
     class Response
@@ -7,22 +10,43 @@
       @id = data.id
       @port = port
       @options = options
+      @queue = []
+      @fresh = true
 
      progress: (progress, data) ->
-      @port.respond this, 'progress', data, progress: progress, @options
+      @queue.push method: 'progress', data: data, options: {progress: progress}
+      @_handleQueue()
 
      success: (data) ->
-      @port.respond this, 'success', data, {}, @options
+      @queue.push method: 'success', data: data, options: {}
+      @_handleQueue()
 
      fail: (data) ->
-      @port.respond this, 'fail', data, {}, @options
+      @queue.push method: 'fail', data: data, options: {}
+      @_handleQueue()
 
+     setOptions: (options) ->
+      @options = options
+      @fresh = true
+      @_handleQueue()
 
+     _handleQueue: ->
+      return unless @queue.length > 0
+
+      d = @queue[0]
+
+      if @port.isStreaming
+       @port.respond this, d.method, d.data, d.options, @options
+       @queue.shift()
+      else if @fresh
+       @port.respond this, d.method, d.data, d.options, @options
+       @queue.shift()
+       @fresh = false
 
 ##Call class
 
     class Call
-     constructor: (@id, @method, @data, @callbacks) -> null
+     constructor: (@id, @method, @data, @callbacks, @options) -> null
 
      handle: (data, options) ->
       if not @callbacks[options.status]?
@@ -37,11 +61,15 @@
       @handlers = {}
       @callsCache = {}
       @callsCounter = 0
+      @id = parseInt Math.random() * 1000
+      @responses = {}
       @wrappers =
        send: []
        respond: []
        handleCall: []
        handleResponse: []
+
+     isStreaming: true
 
      onerror: (msg, options) ->
       console.log msg, options
@@ -72,13 +100,15 @@
        return unless f.apply this, [response, status, data, options, portOptions]
 
       @_respond (@_createResponse response, status, data, options), portOptions
+      if not POLL_TYPE[status]?
+       delete @responses[response.id]
 
 
 ###Create Call object
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
-      call = new Call @callsCounter, method, data, callbacks
+      call = new Call "#{@id}-#{@callsCounter}", method, data, callbacks, options
       @callsCounter++
       @callsCache[call.id] = call
 
@@ -117,13 +147,16 @@ This is a private function
         @_handleResponse data, options
        when 'call'
         @_handleCall data, options
+       when 'poll'
+        @_handlePoll data, options
 
      _handleCall: (data, options) ->
       for f in @wrappers.handleCall
        return unless f.apply this, arguments
       if not @handlers[data.method]?
        throw new Error "Unknown method: #{data.method}"
-      @handlers[data.method] data.data, data, new Response data, this, options
+      @responses[data.id] = new Response data, this, options
+      @handlers[data.method] data.data, data, @responses[data.id]
 
      _handleResponse: (data, options) ->
       for f in @wrappers.handleResponse
@@ -131,6 +164,9 @@ This is a private function
       if not @callsCache[data.id]?
        throw new Error "Response without call: #{data.id}"
       @callsCache[data.id].handle data.data, data
+
+     _handlePoll: (data, options) ->
+      throw new Error "Poll not implemented"
 
 ##WorkerPort class
 Used for browser and worker
@@ -194,6 +230,8 @@ Used for browser and worker
       @http = http
       @_createHttpOptions()
 
+     isStreaming: false
+
      _createHttpOptions: ->
       @httpOptions =
        hostname: @host
@@ -229,7 +267,6 @@ Used for browser and worker
       res.write data
       res.end()
 
-
      _send: (data) ->
       data = JSON.stringify data
       options = @httpOptions
@@ -243,6 +280,19 @@ Used for browser and worker
       req.write data
       req.end()
 
+     _handleResponse: (data, options) ->
+      for f in @wrappers.handleResponse
+       return unless f.apply this, arguments
+      if not @callsCache[data.id]?
+       throw new Error "Response without call: #{data.id}"
+      call = @callsCache[data.id]
+      call.handle data.data, data
+      if POLL_TYPE[data.status]?
+       params =
+        type: 'poll'
+        id: call.id
+       params[k] = v for k, v of call.options
+       @_send params
 
 
 ##NodeHttpServerPort class
@@ -252,6 +302,8 @@ Used for browser and worker
       super()
       @port = options.port
       @http = http
+
+     isStreaming: false
 
      _onRequest: (req, res) ->
       data = ''
@@ -279,6 +331,14 @@ Used for browser and worker
       @server = @http.createServer @_onRequest.bind this
       @server.listen @port
 
+     _handlePoll: (data, options) ->
+      for f in @wrappers.handleCall
+       return unless f.apply this, arguments
+      if not @responses[data.id]?
+       throw new Error "Poll without response: #{data.id}"
+      @responses[data.id].setOptions options
+
+
 
 #IO Module
 
@@ -293,7 +353,7 @@ Used for browser and worker
       NodeHttpServerPort: NodeHttpServerPort
       ServerSocketPort: ServerSocketPort
 
-     setup: (options) ->
+     setup_____: (options) ->
       options.workers ?= []
       switch options.platform
        when 'ui'
