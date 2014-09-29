@@ -219,6 +219,62 @@ Used for browser and worker
 
 
 
+##AJAX class
+
+    class AjaxHttpPort extends Port
+     constructor: (options) ->
+      super()
+      @host = options.host ? 'localhost'
+      @port = options.port ? 80
+      @path = options.path ? '/'
+
+     isStreaming: false
+
+     _onRequest: (xhr) ->
+      return unless xhr.readyState is 4
+      status = xhr.status
+      if ((not status and xhr.responseText?) or
+          (status >= 200 and status < 300) or
+          (status is 304))
+       try
+        jsonData = JSON.parse xhr.responseText
+       catch e
+        @onerror 'ParseError', e
+        return
+
+       @_handleMessage jsonData, xhr: xhr
+      else
+       @onerror 'xhr error'
+
+     _respond: (data, options) ->
+      throw new Error 'AJAX cannot respond'
+
+     _send: (data) ->
+      data = JSON.stringify data
+      xhr = new XMLHttpRequest
+      xhr.open 'POST', "http://#{@host}:#{@port}#{@path}"
+      xhr.onreadystatechange = =>
+       @_onRequest xhr
+      xhr.setRequestHeader 'Accept', 'application/json'
+      #xhr.setRequestHeader 'Content-Type', 'application/json'
+      xhr.send data
+
+     _handleResponse: (data, options) ->
+      for f in @wrappers.handleResponse
+       return unless f.apply this, arguments
+      if not @callsCache[data.id]?
+       throw new Error "Response without call: #{data.id}"
+      call = @callsCache[data.id]
+      call.handle data.data, data
+      if POLL_TYPE[data.status]?
+       params =
+        type: 'poll'
+        id: call.id
+       params[k] = v for k, v of call.options
+       @_send params
+
+
+
 ##NodeHttpPort class
 
     class NodeHttpPort extends Port
@@ -295,6 +351,7 @@ Used for browser and worker
        @_send params
 
 
+
 ##NodeHttpServerPort class
 
     class NodeHttpServerPort extends Port
@@ -315,7 +372,7 @@ Used for browser and worker
        try
         jsonData = JSON.parse data
        catch e
-        console.log 'ParseError', e
+        console.log 'ParseError', e, data
         return
 
        @_handleMessage jsonData, response: res
@@ -349,6 +406,7 @@ Used for browser and worker
      ports:
       WorkerPort: WorkerPort
       SocketPort: SocketPort
+      AjaxHttpPort: AjaxHttpPort
       NodeHttpPort: NodeHttpPort
       NodeHttpServerPort: NodeHttpServerPort
       ServerSocketPort: ServerSocketPort
