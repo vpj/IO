@@ -411,6 +411,11 @@ Used for browser and worker
       NodeHttpServerPort: NodeHttpServerPort
       ServerSocketPort: ServerSocketPort
 
+     Helpers:
+      progress: (from, to, func) ->
+       (progress, data) ->
+        func? progress * (to - from) + from, data
+
      setup_____: (options) ->
       options.workers ?= []
       switch options.platform
