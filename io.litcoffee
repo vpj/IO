@@ -91,7 +91,8 @@
       for f in @wrappers.send
        return unless f.apply this, [method, data, callbacks, options]
 
-      @_send @_createCall method, data, callbacks, options
+      params = @_createCall method, data, callbacks, options
+      @_send params, callbacks
 
 ###Respond to a RPC call
 
@@ -323,7 +324,7 @@ Used for browser and worker
       res.write data
       res.end()
 
-     _send: (data) ->
+     _send: (data, callbacks) ->
       data = JSON.stringify data
       options = @httpOptions
       options.headers['content-length'] = data.length
@@ -331,7 +332,7 @@ Used for browser and worker
       req = @http.request options, @_onRequest.bind this
       delete options.headers['content-length']
       req.on 'error', (e) ->
-       console.log 'error', e
+       callbacks.fail? e
 
       req.write data
       req.end()
@@ -348,7 +349,7 @@ Used for browser and worker
         type: 'poll'
         id: call.id
        params[k] = v for k, v of call.options
-       @_send params
+       @_send params, call.callbacks
 
 
 
