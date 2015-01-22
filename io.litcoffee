@@ -54,6 +54,11 @@
        throw new Error "No callback registered #{@method} #{options.status}"
       @callbacks[options.status] data, options
 
+      if POLL_TYPE[options.status]?
+       return false
+      else
+       return true
+
 ##Port base class
 
     class Port
@@ -72,7 +77,16 @@
      isStreaming: true
 
      onerror: (msg, options) ->
-      console.log msg, options
+      for id, call of @callsCache
+       if not call.callbacks.fail?
+        console.error 'fail callback not registered', call.method, call.data
+       else
+        call.callbacks.fail error: 'connectionError', msg: msg, options: options, {}
+
+      @callsCache = {}
+
+     errorCallback: (msg, options) ->
+      console.error msg, options
 
      wrap: (wrapper) ->
       for key, f of wrapper
@@ -164,7 +178,8 @@ This is a private function
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
        throw new Error "Response without call: #{data.id}"
-      @callsCache[data.id].handle data.data, data
+      if @callsCache[data.id].handle data.data, data
+       delete @callsCache[data.id]
 
      _handlePoll: (data, options) ->
       throw new Error "Poll not implemented"
@@ -177,7 +192,7 @@ Used for browser and worker
       super()
       @worker = worker
       @worker.onmessage = @_onMessage.bind this
-      @worker.onerror = @_onError.bind this
+      @worker.onerror = @onerror.bind this
 
      _send: (data) ->  @worker.postMessage data
      _respond: (data) -> @worker.postMessage data
@@ -185,8 +200,6 @@ Used for browser and worker
      _onMessage: (e) ->
       data = e.data
       @_handleMessage data
-
-     _onError: (e) -> console.log e
 
 
 
@@ -234,7 +247,7 @@ Used for browser and worker
      _onRequest: (xhr) ->
       return unless xhr.readyState is 4
       status = xhr.status
-      if ((not status and xhr.responseText?) or
+      if ((not status and xhr.responseText? and xhr.responseText != '') or
           (status >= 200 and status < 300) or
           (status is 304))
        try
@@ -245,7 +258,7 @@ Used for browser and worker
 
        @_handleMessage jsonData, xhr: xhr
       else
-       @onerror 'xhr error'
+       @onerror 'Cannot connect to server'
 
      _respond: (data, options) ->
       throw new Error 'AJAX cannot respond'
@@ -266,8 +279,7 @@ Used for browser and worker
       if not @callsCache[data.id]?
        throw new Error "Response without call: #{data.id}"
       call = @callsCache[data.id]
-      call.handle data.data, data
-      if POLL_TYPE[data.status]?
+      if not call.handle data.data, data
        params =
         type: 'poll'
         id: call.id
@@ -312,7 +324,7 @@ Used for browser and worker
        try
         jsonData = JSON.parse data
        catch e
-        console.log 'ParseError', e
+        @onerror 'ParseError', e
         return
 
        @_handleMessage jsonData, response: res
@@ -343,8 +355,7 @@ Used for browser and worker
       if not @callsCache[data.id]?
        throw new Error "Response without call: #{data.id}"
       call = @callsCache[data.id]
-      call.handle data.data, data
-      if POLL_TYPE[data.status]?
+      if not call.handle data.data, data
        params =
         type: 'poll'
         id: call.id
