@@ -51,6 +51,7 @@
      handle: (data, options) ->
       if not @callbacks[options.status]?
        return if options.status is 'progress'
+       #Handled by caller
        throw new Error "No callback registered #{@method} #{options.status}"
       @callbacks[options.status] data, options
 
@@ -76,7 +77,7 @@
 
      isStreaming: true
 
-     onerror: (msg, options) ->
+     onCallError: (msg, options) ->
       for id, call of @callsCache
        if not call.callbacks.fail?
         console.error 'fail callback not registered', call.method, call.data
@@ -84,6 +85,13 @@
         call.callbacks.fail error: 'connectionError', msg: msg, options: options, {}
 
       @callsCache = {}
+
+      @errorCallback msg, options
+
+     onHandleError: (msg, data, options) ->
+      @errorCallback msg, data
+      response = new Response data, this, options
+      response.fail msg
 
      errorCallback: (msg, options) ->
       console.error msg, options
@@ -169,7 +177,8 @@ This is a private function
       for f in @wrappers.handleCall
        return unless f.apply this, arguments
       if not @handlers[data.method]?
-       throw new Error "Unknown method: #{data.method}"
+       @onHandleError "Unknown method: #{data.method}", data, options
+       return
       @responses[data.id] = new Response data, this, options
       @handlers[data.method] data.data, data, @responses[data.id]
 
@@ -177,12 +186,18 @@ This is a private function
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
-       throw new Error "Response without call: #{data.id}"
-      if @callsCache[data.id].handle data.data, data
+       #Cannot reply
+       @errorCallback "Response without call: #{data.id}", data
+       return
+      try
+       if @callsCache[data.id].handle data.data, data
+        delete @callsCache[data.id]
+      catch e
+       @errorCallback e.message, data
        delete @callsCache[data.id]
 
      _handlePoll: (data, options) ->
-      throw new Error "Poll not implemented"
+      @onHandleError "Poll not implemented", data, options
 
 ##WorkerPort class
 Used for browser and worker
@@ -192,7 +207,7 @@ Used for browser and worker
       super()
       @worker = worker
       @worker.onmessage = @_onMessage.bind this
-      @worker.onerror = @onerror.bind this
+      @worker.onerror = @onCallError.bind this
 
      _send: (data) ->  @worker.postMessage data
      _respond: (data) -> @worker.postMessage data
@@ -253,15 +268,15 @@ Used for browser and worker
        try
         jsonData = JSON.parse xhr.responseText
        catch e
-        @onerror 'ParseError', e
+        @onCallError 'ParseError', e
         return
 
        @_handleMessage jsonData, xhr: xhr
       else
-       @onerror 'Cannot connect to server'
+       @onCallError 'Cannot connect to server'
 
      _respond: (data, options) ->
-      throw new Error 'AJAX cannot respond'
+      @errorCallback 'AJAX cannot respond', data
 
      _send: (data) ->
       data = JSON.stringify data
@@ -277,7 +292,8 @@ Used for browser and worker
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
-       throw new Error "Response without call: #{data.id}"
+       @errorCallback "Response without call: #{data.id}", data
+       return
       call = @callsCache[data.id]
       if not call.handle data.data, data
        params =
@@ -324,7 +340,7 @@ Used for browser and worker
        try
         jsonData = JSON.parse data
        catch e
-        @onerror 'ParseError', e
+        @onCallError 'ParseError', e
         return
 
        @_handleMessage jsonData, response: res
@@ -353,7 +369,8 @@ Used for browser and worker
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
-       throw new Error "Response without call: #{data.id}"
+       @errorCallback "Response without call: #{data.id}", data
+       return
       call = @callsCache[data.id]
       if not call.handle data.data, data
        params =
@@ -384,7 +401,7 @@ Used for browser and worker
        try
         jsonData = JSON.parse data
        catch e
-        console.log 'ParseError', e, data
+        @errorCallback 'ParseError', e
         return
 
        @_handleMessage jsonData, response: res
@@ -404,7 +421,8 @@ Used for browser and worker
       for f in @wrappers.handleCall
        return unless f.apply this, arguments
       if not @responses[data.id]?
-       throw new Error "Poll without response: #{data.id}"
+       @onHandleError "Poll without response: #{data.id}", data, options
+       return
       @responses[data.id].setOptions options
 
 
