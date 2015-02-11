@@ -193,6 +193,7 @@ This is a private function
        if @callsCache[data.id].handle data.data, data
         delete @callsCache[data.id]
       catch e
+       #throw e
        @errorCallback e.message, data
        delete @callsCache[data.id]
 
