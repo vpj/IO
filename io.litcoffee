@@ -1,5 +1,16 @@
     _self = this
 
+    if console?.log?
+     LOG = console.log.bind console
+    else
+     LOG = -> null
+
+    if console?.error?
+     ERROR_LOG = console.error.bind console
+    else
+     ERROR_LOG = -> null
+
+
     POLL_TYPE =
      progress: true
 
@@ -80,7 +91,7 @@
      onCallError: (msg, options) ->
       for id, call of @callsCache
        if not call.callbacks.fail?
-        console.error 'fail callback not registered', call.method, call.data
+        ERROR_LOG 'fail callback not registered', call.method, call.data
        else
         call.callbacks.fail error: 'connectionError', msg: msg, options: options, {}
 
@@ -94,7 +105,7 @@
       response.fail msg
 
      errorCallback: (msg, options) ->
-      console.error msg, options
+      ERROR_LOG msg, options
 
      wrap: (wrapper) ->
       for key, f of wrapper
@@ -331,12 +342,12 @@ Used for browser and worker
 
      _onRequest: (res) ->
       data = ''
-      #console.log 'STATUS: ' + res.statusCode
-      #console.log 'HEADERS: ' + JSON.stringify res.headers
+      #LOG 'STATUS: ' + res.statusCode
+      #LOG 'HEADERS: ' + JSON.stringify res.headers
       res.setEncoding 'utf8'
       res.on 'data', (chunk) ->
        data += chunk
-      #console.log 'result', res
+      #LOG 'result', res
       res.on 'end', =>
        try
         jsonData = JSON.parse data
