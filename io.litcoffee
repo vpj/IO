@@ -64,7 +64,8 @@
        return if options.status is 'progress'
        #Handled by caller
        throw new Error "No callback registered #{@method} #{options.status}"
-      @callbacks[options.status] data, options
+      self = this
+      setTimeout (-> self.callbacks[options.status] data, options), 0
 
       if POLL_TYPE[options.status]?
        return false
@@ -204,7 +205,6 @@ This is a private function
        if @callsCache[data.id].handle data.data, data
         delete @callsCache[data.id]
       catch e
-       #throw e
        @errorCallback e.message, data
        delete @callsCache[data.id]
 
@@ -219,7 +219,7 @@ Used for browser and worker
       super()
       @worker = worker
       @worker.onmessage = @_onMessage.bind this
-      @worker.onerror = @onCallError.bind this
+      #@worker.onerror = @onCallError.bind this
 
      _send: (data) ->  @worker.postMessage data
      _respond: (data) -> @worker.postMessage data
@@ -335,6 +335,7 @@ Used for browser and worker
        port: @port
        path: @path
        method: 'POST'
+       agent: false
        headers:
         accept: 'application/json'
        'content-type': 'application/json'
