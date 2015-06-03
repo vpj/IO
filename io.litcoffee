@@ -24,8 +24,12 @@
       @queue = []
       @fresh = true
 
-     progress: (progress, data) ->
-      @queue.push method: 'progress', data: data, options: {progress: progress}
+     progress: (progress, data, callback) ->
+      @queue.push
+       method: 'progress'
+       data: data
+       options: {progress: progress}
+       callback: callback
       @_handleQueue()
 
      success: (data) ->
@@ -47,10 +51,10 @@
       d = @queue[0]
 
       if @port.isStreaming
-       @port.respond this, d.method, d.data, d.options, @options
+       @port.respond this, d.method, d.data, d.options, @options, d.callback
        @queue.shift()
       else if @fresh
-       @port.respond this, d.method, d.data, d.options, @options
+       @port.respond this, d.method, d.data, d.options, @options, d.callback
        @queue.shift()
        @fresh = false
 
@@ -130,11 +134,11 @@
 
 ###Respond to a RPC call
 
-     respond: (response, status, data, options = {}, portOptions = {}) ->
+     respond: (response, status, data, options = {}, portOptions = {}, callback = null) ->
       for f in @wrappers.respond
        return unless f.apply this, [response, status, data, options, portOptions]
 
-      @_respond (@_createResponse response, status, data, options), portOptions
+      @_respond (@_createResponse response, status, data, options), portOptions, callback
       if not POLL_TYPE[status]?
        delete @responses[response.id]
 
@@ -222,7 +226,9 @@ Used for browser and worker
       #@worker.onerror = @onCallError.bind this
 
      _send: (data) ->  @worker.postMessage data
-     _respond: (data) -> @worker.postMessage data
+     _respond: (data, options, callback) ->
+      @worker.postMessage data
+      callback?()
 
      _onMessage: (e) ->
       data = e.data
@@ -239,7 +245,9 @@ Used for browser and worker
       @socket.on 'message', @_onMessage.bind this
 
      _send: (data) ->  @socket.emit 'message', data
-     _respond: (data) -> @worker.emit 'message', data
+     _respond: (data, options, callback) ->
+      @worker.emit 'message', data
+      callback?()
 
      _onMessage: (e) ->
       data = e.data
@@ -287,8 +295,9 @@ Used for browser and worker
       else
        @onCallError 'Cannot connect to server'
 
-     _respond: (data, options) ->
+     _respond: (data, options, callback) ->
       @errorCallback 'AJAX cannot respond', data
+      callback?()
 
      _send: (data) ->
       data = JSON.stringify data
@@ -358,12 +367,12 @@ Used for browser and worker
 
        @_handleMessage jsonData, response: res
 
-     _respond: (data, options) ->
+     _respond: (data, options, callback) ->
       data = JSON.stringify data
       res = options.response
       res.setHeader 'content-length', data.length
       res.write data
-      res.end()
+      res.end callback
 
      _send: (data, callbacks) ->
       data = JSON.stringify data
@@ -419,12 +428,12 @@ Used for browser and worker
 
        @_handleMessage jsonData, response: res
 
-     _respond: (data, options) ->
+     _respond: (data, options, callback) ->
       data = JSON.stringify data
       res = options.response
       res.setHeader 'content-length', data.length
       res.write data
-      res.end()
+      res.end callback
 
      listen: ->
       @server = @http.createServer @_onRequest.bind this
