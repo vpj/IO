@@ -371,8 +371,14 @@ Used for browser and worker
       data = JSON.stringify data
       res = options.response
       res.setHeader 'content-length', data.length
+      if callback?
+       res.once 'finish', ->
+        callback()
+       res.once 'close', ->
+        callback()
+
       res.write data
-      res.end callback
+      res.end()
 
      _send: (data, callbacks) ->
       data = JSON.stringify data
@@ -432,8 +438,14 @@ Used for browser and worker
       data = JSON.stringify data
       res = options.response
       res.setHeader 'content-length', data.length
+      if callback?
+       res.once 'finish', ->
+        callback()
+       res.once 'close', ->
+        callback()
+
       res.write data
-      res.end callback
+      res.end()
 
      listen: ->
       @server = @http.createServer @_onRequest.bind this
