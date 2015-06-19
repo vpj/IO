@@ -370,7 +370,7 @@ Used for browser and worker
      _respond: (data, options, callback) ->
       data = JSON.stringify data
       res = options.response
-      res.setHeader 'content-length', data.length
+      res.setHeader 'content-length', Buffer.byteLength data, 'utf8'
       if callback?
        res.once 'finish', ->
         callback()
@@ -383,7 +383,7 @@ Used for browser and worker
      _send: (data, callbacks) ->
       data = JSON.stringify data
       options = @httpOptions
-      options.headers['content-length'] = data.length
+      options.headers['content-length'] = Buffer.byteLength data, 'utf8'
 
       req = @http.request options, @_onRequest.bind this
       delete options.headers['content-length']
@@ -437,7 +437,7 @@ Used for browser and worker
      _respond: (data, options, callback) ->
       data = JSON.stringify data
       res = options.response
-      res.setHeader 'content-length', data.length
+      res.setHeader 'content-length', Buffer.byteLength data, 'utf8'
       if callback?
        res.once 'finish', ->
         callback()
