@@ -316,12 +316,18 @@ Used for browser and worker
        @errorCallback "Response without call: #{data.id}", data
        return
       call = @callsCache[data.id]
-      if not call.handle data.data, data
-       params =
-        type: 'poll'
-        id: call.id
-       params[k] = v for k, v of call.options
-       @_send params
+      try
+       if call.handle data.data, data
+        delete @callsCache[data.id]
+       else
+        params =
+         type: 'poll'
+         id: call.id
+        params[k] = v for k, v of call.options
+        @_send params
+      catch e
+       @errorCallback e.message, data
+       delete @callsCache[data.id]
 
 
 
