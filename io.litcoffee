@@ -273,9 +273,21 @@ Used for browser and worker
     class AjaxHttpPort extends Port
      constructor: (options) ->
       super()
-      @host = options.host ? 'localhost'
-      @port = options.port ? 80
+      @protocol = options.protocol
+      @host = options.host
+      @port = options.port
       @path = options.path ? '/'
+      @url = @path
+      if @protocol?
+       if @host? and not @port?
+        @url = "#{@protocol}://#{@host}#{@path}"
+       else if @host? and @port?
+        @url = "#{@protocol}://#{@host}:#{@port}#{@path}"
+      else
+       if @host? and not @port?
+        @url = "//#{@host}#{@path}"
+       else if @host? and @port?
+        @url = "#{@host}:#{@port}#{@path}"
 
      isStreaming: false
 
@@ -302,7 +314,7 @@ Used for browser and worker
      _send: (data) ->
       data = JSON.stringify data
       xhr = new XMLHttpRequest
-      xhr.open 'POST', "http://#{@host}:#{@port}#{@path}"
+      xhr.open 'POST', @url
       xhr.onreadystatechange = =>
        @_onRequest xhr
       xhr.setRequestHeader 'Accept', 'application/json'
