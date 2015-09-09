@@ -477,6 +477,21 @@ Used for browser and worker
        return
       @responses[data.id].setOptions options
 
+##NodeHttpsServerPort class
+
+    class NodeHttpsServerPort extends NodeHttpServerPort
+     constructor: (options, http) ->
+      super options, http
+      @_key = options.key
+      @_cert = options.cert
+
+     listen: ->
+      options =
+       key: @_key
+       cert: @_cert
+
+      @server = @http.createServer options, @_onRequest.bind this
+      @server.listen @port
 
 
 #IO Module
@@ -491,6 +506,7 @@ Used for browser and worker
       AjaxHttpPort: AjaxHttpPort
       NodeHttpPort: NodeHttpPort
       NodeHttpServerPort: NodeHttpServerPort
+      NodeHttpsServerPort: NodeHttpsServerPort
       ServerSocketPort: ServerSocketPort
 
      Helpers:
