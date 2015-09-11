@@ -287,7 +287,7 @@ Used for browser and worker
        if @host? and not @port?
         @url = "//#{@host}#{@path}"
        else if @host? and @port?
-        @url = "#{@host}:#{@port}#{@path}"
+        @url = "//#{@host}:#{@port}#{@path}"
 
      isStreaming: false
 
