@@ -430,10 +430,11 @@ Used for browser and worker
 ##NodeHttpServerPort class
 
     class NodeHttpServerPort extends Port
-     constructor: (options, http) ->
+     constructor: (options, http, zlib = null) ->
       super()
       @port = options.port
       @http = http
+      @zlib = zlib
 
      isStreaming: false
 
@@ -450,20 +451,41 @@ Used for browser and worker
         @errorCallback 'ParseError', e
         return
 
-       @_handleMessage jsonData, response: res
+       @_handleMessage jsonData, response: res, request: req
 
      _respond: (data, options, callback) ->
-      data = JSON.stringify data
-      res = options.response
-      res.setHeader 'content-length', Buffer.byteLength data, 'utf8'
-      if callback?
-       res.once 'finish', ->
-        callback()
-       res.once 'close', ->
-        callback()
+      accept = options.request.headers['accept-encoding']
+      accept ?= ''
+      if not @zlib?
+       accept = ''
 
-      res.write data
-      res.end()
+      data = JSON.stringify data
+      buffer = new Buffer data, 'utf8'
+      if accept.match /\bdeflate\b/
+       options.response.setHeader 'content-encoding', 'deflate'
+       @zlib.deflate buffer, (err, result) =>
+        if err?
+         return @errorCallback 'DeflateError', e
+        @_sendBuffer result, options.response
+      else if accept.match /\bgzip\b/
+       options.response.setHeader 'content-encoding', 'gzip'
+       @zlib.gzip buffer, (err, result) =>
+        if err?
+         return @errorCallback 'GZipeError', e
+        @_sendBuffer result, options.response
+      else
+       @_sendBuffer buffer, options.response
+
+     _sendBuffer: (buf, res) ->
+       res.setHeader 'content-length', buf.length
+       if callback?
+        res.once 'finish', ->
+         callback()
+        res.once 'close', ->
+         callback()
+
+       res.write buf
+       res.end()
 
      listen: ->
       @server = @http.createServer @_onRequest.bind this
