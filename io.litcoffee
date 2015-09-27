@@ -466,17 +466,17 @@ Used for browser and worker
        @zlib.deflate buffer, (err, result) =>
         if err?
          return @errorCallback 'DeflateError', e
-        @_sendBuffer result, options.response
+        @_sendBuffer result, options.response, callback
       else if accept.match /\bgzip\b/
        options.response.setHeader 'content-encoding', 'gzip'
        @zlib.gzip buffer, (err, result) =>
         if err?
          return @errorCallback 'GZipeError', e
-        @_sendBuffer result, options.response
+        @_sendBuffer result, options.response, callback
       else
-       @_sendBuffer buffer, options.response
+       @_sendBuffer buffer, options.response, callback
 
-     _sendBuffer: (buf, res) ->
+     _sendBuffer: (buf, res, callback) ->
        res.setHeader 'content-length', buf.length
        if callback?
         res.once 'finish', ->
