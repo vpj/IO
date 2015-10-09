@@ -435,6 +435,7 @@ Used for browser and worker
       @port = options.port
       @http = http
       @zlib = zlib
+      @allowOrigin = options.allowOrigin
 
      isStreaming: false
 
@@ -454,6 +455,9 @@ Used for browser and worker
        @_handleMessage jsonData, response: res, request: req
 
      _respond: (data, options, callback) ->
+      if @allowOrigin?
+       options.response.setHeader 'Access-Control-Allow-Origin', @allowOrigin
+
       accept = options.request.headers['accept-encoding']
       accept ?= ''
       if not @zlib?
