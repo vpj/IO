@@ -45,18 +45,47 @@
       @fresh = true
       @_handleQueue()
 
+     _multipleResponse: ->
+      responseList = []
+      callbacks = []
+      for d in @queue
+       responseList.push
+        status: d.method
+        data: d.data
+        options: d.options
+       if d.callback?
+        callbacks.push d.callback
+
+      done = ->
+       for callback in callbacks
+        callback()
+
+      if @port.isStreaming
+       @port.respondMultiple this, responseList, @options, done
+      else if @fresh
+       @port.respondMultiple this, responseList, @options, done
+       @fresh = false
+
+      @queue = []
+
+
      _handleQueue: ->
       return unless @queue.length > 0
+      return if not @queue.isStreaming and not @fresh
+
+      if @queue.length > 1
+       return @_multipleResponse()
+
 
       d = @queue[0]
 
       if @port.isStreaming
        @port.respond this, d.method, d.data, d.options, @options, d.callback
-       @queue.shift()
       else if @fresh
        @port.respond this, d.method, d.data, d.options, @options, d.callback
-       @queue.shift()
        @fresh = false
+
+      @queue = []
 
 ##Call class
 
@@ -135,12 +164,42 @@
 ###Respond to a RPC call
 
      respond: (response, status, data, options = {}, portOptions = {}, callback = null) ->
+      if not POLL_TYPE[status]?
+       delete @responses[response.id]
+
       for f in @wrappers.respond
        return unless f.apply this, [response, status, data, options, portOptions]
 
       @_respond (@_createResponse response, status, data, options), portOptions, callback
-      if not POLL_TYPE[status]?
-       delete @responses[response.id]
+
+     respondMultiple: (response, list, portOptions = {}, callback = null) ->
+      for d in list
+       if not POLL_TYPE[d.status]?
+        delete @responses[response.id]
+        break
+
+      data = []
+      for d in list
+       cancel = false
+       d.options ?= {}
+       for f in @wrappers.respond
+        r = f.apply this, [response, d.status, d.data, d.options, portOptions]
+        if not r
+         cancel = true
+         break
+
+        continue if cancel
+
+       data.push @_createResponse response, d.status, d.data, d.options
+
+      return if data.length is 0
+
+      data =
+       type: 'list'
+       list: data
+
+      @_respond data, portOptions, callback
+
 
 
 ###Create Call object
@@ -180,14 +239,17 @@ This is a private function
 
 ###Handle incoming message
 
-     _handleMessage: (data, options) ->
+     _handleMessage: (data, options, last = true) ->
       switch data.type
+       when 'list'
+        for d, i in data.list
+         @_handleMessage d, options, (last and i + 1 is data.list.length)
        when 'response'
-        @_handleResponse data, options
+        @_handleResponse data, options, last
        when 'call'
-        @_handleCall data, options
+        @_handleCall data, options, last
        when 'poll'
-        @_handlePoll data, options
+        @_handlePoll data, options, last
 
      _handleCall: (data, options) ->
       for f in @wrappers.handleCall
@@ -225,7 +287,9 @@ Used for browser and worker
       @worker.onmessage = @_onMessage.bind this
       #@worker.onerror = @onCallError.bind this
 
-     _send: (data) ->  @worker.postMessage data
+     _send: (data) ->
+      @worker.postMessage data
+
      _respond: (data, options, callback) ->
       @worker.postMessage data
       callback?()
@@ -321,7 +385,7 @@ Used for browser and worker
       #xhr.setRequestHeader 'Content-Type', 'application/json'
       xhr.send data
 
-     _handleResponse: (data, options) ->
+     _handleResponse: (data, options, last = true) ->
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
@@ -331,7 +395,7 @@ Used for browser and worker
       try
        if call.handle data.data, data
         delete @callsCache[data.id]
-       else
+       else if last
         params =
          type: 'poll'
          id: call.id
@@ -411,7 +475,7 @@ Used for browser and worker
       req.write data
       req.end()
 
-     _handleResponse: (data, options) ->
+     _handleResponse: (data, options, last = true) ->
       for f in @wrappers.handleResponse
        return unless f.apply this, arguments
       if not @callsCache[data.id]?
@@ -419,6 +483,7 @@ Used for browser and worker
        return
       call = @callsCache[data.id]
       if not call.handle data.data, data
+       return if not last
        params =
         type: 'poll'
         id: call.id
