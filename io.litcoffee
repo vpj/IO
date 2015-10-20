@@ -123,13 +123,13 @@
      isStreaming: true
 
      onCallError: (msg, options) ->
-      for id, call of @callsCache
+      callsCache = @callsCache
+      @callsCache = {}
+      for id, call of callsCache
        if not call.callbacks.fail?
         ERROR_LOG 'fail callback not registered', call.method, call.data
        else
         call.callbacks.fail error: 'connectionError', msg: msg, options: options, {}
-
-      @callsCache = {}
 
       @errorCallback msg, options
 
