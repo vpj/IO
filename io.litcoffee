@@ -300,6 +300,29 @@ Used for browser and worker
 
 
 
+##FramePort class
+Used for browser and worker
+
+    class FramePort extends Port
+     constructor: (source, dest) ->
+      super()
+      @source = source
+      @dest = dest
+      @source.addEventListener 'message', @_onMessage.bind this
+
+     _send: (data) ->
+      @dest.postMessage data, '*'
+
+     _respond: (data, options, callback) ->
+      @dest.postMessage data, '*'
+      callback?()
+
+     _onMessage: (e) ->
+      data = e.data
+      @_handleMessage data
+
+
+
 ##SocketPort class
 
     class SocketPort extends Port
@@ -593,6 +616,7 @@ Used for browser and worker
 
      ports:
       WorkerPort: WorkerPort
+      FramePort: FramePort
       SocketPort: SocketPort
       AjaxHttpPort: AjaxHttpPort
       NodeHttpPort: NodeHttpPort
