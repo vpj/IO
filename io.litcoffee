@@ -90,7 +90,7 @@
 ##Call class
 
     class Call
-     constructor: (@id, @method, @data, @callbacks, @options) -> null
+     constructor: (@id, @method, @data, @callbacks, @options, @port) -> null
 
      handle: (data, options) ->
       if not @callbacks[options.status]?
@@ -98,7 +98,12 @@
        #Handled by caller
        throw new Error "No callback registered #{@method} #{options.status}"
       self = this
-      setTimeout (-> self.callbacks[options.status] data, options), 0
+      setTimeout ->
+       try
+        self.callbacks[options.status] data, options
+       catch e
+        self.port.onerror? e
+      0
 
       if POLL_TYPE[options.status]?
        return false
@@ -206,7 +211,12 @@
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
-      call = new Call "#{@id}-#{@callsCounter}", method, data, callbacks, options
+      call = new Call "#{@id}-#{@callsCounter}",
+                      method
+                      data
+                      callbacks
+                      options
+                      this
       @callsCounter++
       @callsCache[call.id] = call
 
