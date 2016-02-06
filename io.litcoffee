@@ -245,11 +245,20 @@ This is a private function
         for d, i in data.list
          @_handleMessage d, options, (last and i + 1 is data.list.length)
        when 'response'
-        @_handleResponse data, options, last
+        try
+         @_handleResponse data, options, last
+        catch e
+         @onerror? e
        when 'call'
-        @_handleCall data, options, last
+        try
+         @_handleCall data, options, last
+        catch e
+         @onerror? e
        when 'poll'
-        @_handlePoll data, options, last
+        try
+         @_handlePoll data, options, last
+        catch e
+         @onerror? e
 
      _handleCall: (data, options) ->
       for f in @wrappers.handleCall
