@@ -511,8 +511,11 @@ Used for browser and worker
 
       req = @http.request options, @_onRequest.bind this
       delete options.headers['content-length']
-      req.on 'error', (e) ->
-       callbacks.fail? e
+      req.on 'error', (e) =>
+       try
+        callbacks.fail? e
+       catch err
+        @onerror? err
 
       req.write data
       req.end()
