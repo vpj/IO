@@ -103,7 +103,7 @@
         self.callbacks[options.status] data, options
        catch e
         self.port.onerror? e
-      0
+      , 0
 
       if POLL_TYPE[options.status]?
        return false
