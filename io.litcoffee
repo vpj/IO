@@ -90,7 +90,7 @@
 ##Call class
 
     class Call
-     constructor: (@id, @method, @data, @callbacks, @options) -> null
+     constructor: (@id, @method, @data, @callbacks, @options, @port) -> null
 
      handle: (data, options) ->
       if not @callbacks[options.status]?
@@ -98,7 +98,12 @@
        #Handled by caller
        throw new Error "No callback registered #{@method} #{options.status}"
       self = this
-      setTimeout (-> self.callbacks[options.status] data, options), 0
+      setTimeout ->
+       try
+        self.callbacks[options.status] data, options
+       catch e
+        self.port.onerror? e
+      , 0
 
       if POLL_TYPE[options.status]?
        return false
@@ -206,7 +211,12 @@
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
-      call = new Call "#{@id}-#{@callsCounter}", method, data, callbacks, options
+      call = new Call "#{@id}-#{@callsCounter}",
+                      method
+                      data
+                      callbacks
+                      options
+                      this
       @callsCounter++
       @callsCache[call.id] = call
 
@@ -245,11 +255,20 @@ This is a private function
         for d, i in data.list
          @_handleMessage d, options, (last and i + 1 is data.list.length)
        when 'response'
-        @_handleResponse data, options, last
+        try
+         @_handleResponse data, options, last
+        catch e
+         @onerror? e
        when 'call'
-        @_handleCall data, options, last
+        try
+         @_handleCall data, options, last
+        catch e
+         @onerror? e
        when 'poll'
-        @_handlePoll data, options, last
+        try
+         @_handlePoll data, options, last
+        catch e
+         @onerror? e
 
      _handleCall: (data, options) ->
       for f in @wrappers.handleCall
@@ -292,6 +311,29 @@ Used for browser and worker
 
      _respond: (data, options, callback) ->
       @worker.postMessage data
+      callback?()
+
+     _onMessage: (e) ->
+      data = e.data
+      @_handleMessage data
+
+
+
+##FramePort class
+Used for browser and worker
+
+    class FramePort extends Port
+     constructor: (source, dest) ->
+      super()
+      @source = source
+      @dest = dest
+      @source.addEventListener 'message', @_onMessage.bind this
+
+     _send: (data) ->
+      @dest.postMessage data, '*'
+
+     _respond: (data, options, callback) ->
+      @dest.postMessage data, '*'
       callback?()
 
      _onMessage: (e) ->
@@ -469,8 +511,11 @@ Used for browser and worker
 
       req = @http.request options, @_onRequest.bind this
       delete options.headers['content-length']
-      req.on 'error', (e) ->
-       callbacks.fail? e
+      req.on 'error', (e) =>
+       try
+        callbacks.fail? e
+       catch err
+        @onerror? err
 
       req.write data
       req.end()
@@ -593,6 +638,7 @@ Used for browser and worker
 
      ports:
       WorkerPort: WorkerPort
+      FramePort: FramePort
       SocketPort: SocketPort
       AjaxHttpPort: AjaxHttpPort
       NodeHttpPort: NodeHttpPort
