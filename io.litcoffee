@@ -530,17 +530,17 @@ Used for browser and worker
 
       data = JSON.stringify data
       buffer = new Buffer data, 'utf8'
-      if accept.match /\bdeflate\b/
-       options.response.setHeader 'content-encoding', 'deflate'
-       @zlib.deflate buffer, (err, result) =>
-        if err?
-         return @errorCallback 'DeflateError', e
-        @_sendBuffer result, options.response, callback
-      else if accept.match /\bgzip\b/
+      if accept.match /\bgzip\b/
        options.response.setHeader 'content-encoding', 'gzip'
        @zlib.gzip buffer, (err, result) =>
         if err?
          return @errorCallback 'GZipeError', e
+        @_sendBuffer result, options.response, callback
+      else if accept.match /\bdeflate\b/
+       options.response.setHeader 'content-encoding', 'deflate'
+       @zlib.deflate buffer, (err, result) =>
+        if err?
+         return @errorCallback 'DeflateError', e
         @_sendBuffer result, options.response, callback
       else
        @_sendBuffer buffer, options.response, callback
