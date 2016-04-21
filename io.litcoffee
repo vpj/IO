@@ -102,7 +102,10 @@
        try
         self.callbacks[options.status] data, options
        catch e
-        self.port.onerror? e
+        if self.port.onerror?
+         self.port.onerror e
+        else
+         throw e
       , 0
 
       if POLL_TYPE[options.status]?
