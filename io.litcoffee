@@ -310,17 +310,19 @@ Used for browser and worker
       #@worker.onerror = @onCallError.bind this
 
      _send: (data) ->
-      if data._transferList?
-       transferList = data._transferList
-       delete data._transferList
+      dd = data.data
+      if dd? and dd._transferList?
+       transferList = dd._transferList
+       delete dd._transferList
       else
        transferList = []
       @worker.postMessage data, transferList
 
      _respond: (data, options, callback) ->
-      if data._transferList?
-       transferList = data._transferList
-       delete data._transferList
+      dd = data.data
+      if dd? and dd._transferList?
+       transferList = dd._transferList
+       delete dd._transferList
       else
        transferList = []
       @worker.postMessage data, transferList
