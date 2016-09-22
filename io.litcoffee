@@ -71,7 +71,7 @@
 
      _handleQueue: ->
       return unless @queue.length > 0
-      return if not @queue.isStreaming and not @fresh
+      return if not @port.isStreaming and not @fresh
 
       if @queue.length > 1
        return @_multipleResponse()
