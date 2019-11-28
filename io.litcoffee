@@ -14,7 +14,7 @@
     POLL_TYPE =
      progress: true
 
-##Response class
+## Response class
 
     class Response
      constructor: (data, port, options) ->
@@ -87,7 +87,7 @@
 
       @queue = []
 
-##Call class
+## Call class
 
     class Call
      constructor: (@id, @method, @data, @callbacks, @options, @port) -> null
@@ -113,7 +113,7 @@
       else
        return true
 
-##Port base class
+## Port base class
 
     class Port
      constructor: ->
@@ -156,7 +156,7 @@
        else
         this[key] = f
 
-###Send RPC call
+### Send RPC call
 
      send: (method, data, callbacks, options = {}) ->
       if (typeof callbacks) is 'function'
@@ -169,7 +169,7 @@
       params = @_createCall method, data, callbacks, options
       @_send params, callbacks
 
-###Respond to a RPC call
+### Respond to a RPC call
 
      respond: (response, status, data, options = {}, portOptions = {}, callback = null) ->
       if not POLL_TYPE[status]?
@@ -210,7 +210,7 @@
 
 
 
-###Create Call object
+### Create Call object
 This is a private function
 
      _createCall: (method, data, callbacks, options) ->
@@ -232,7 +232,7 @@ This is a private function
       params[k] = v for k, v of options
       return params
 
-###Create Response object
+### Create Response object
 
      _createResponse: (response, status, data, options) ->
       params =
@@ -245,12 +245,12 @@ This is a private function
 
       return params
 
-###Add handler
+### Add handler
 
      on: (method, callback) ->
       @handlers[method] = callback
 
-###Handle incoming message
+### Handle incoming message
 
      _handleMessage: (data, options, last = true) ->
       switch data.type
@@ -299,7 +299,7 @@ This is a private function
      _handlePoll: (data, options) ->
       @onHandleError "Poll not implemented", data, options
 
-##WorkerPort class
+## WorkerPort class
 Used for browser and worker
 
     class WorkerPort extends Port
@@ -334,7 +334,7 @@ Used for browser and worker
 
 
 
-##FramePort class
+## FramePort class
 Used for browser and worker
 
     class FramePort extends Port
@@ -357,7 +357,7 @@ Used for browser and worker
 
 
 
-##SocketPort class
+## SocketPort class
 
     class SocketPort extends Port
      constructor: (socket) ->
@@ -376,7 +376,7 @@ Used for browser and worker
 
 
 
-##ServerSocketPort class
+## ServerSocketPort class
 
     class ServerSocketPort extends Port
      constructor: (server) ->
@@ -389,7 +389,7 @@ Used for browser and worker
 
 
 
-##AJAX class
+## AJAX class
 
     class AjaxHttpPort extends Port
      constructor: (options) ->
@@ -464,7 +464,7 @@ Used for browser and worker
 
 
 
-##NodeHttpPort class
+## NodeHttpPort class
 
     class NodeHttpPort extends Port
      constructor: (options, http) ->
@@ -552,7 +552,7 @@ Used for browser and worker
 
 
 
-##NodeHttpServerPort class
+## NodeHttpServerPort class
 
     class NodeHttpServerPort extends Port
      constructor: (options, http, zlib = null) ->
@@ -628,7 +628,7 @@ Used for browser and worker
        return
       @responses[data.id].setOptions options
 
-##NodeHttpsServerPort class
+## NodeHttpsServerPort class
 
     class NodeHttpsServerPort extends NodeHttpServerPort
      constructor: (options, http) ->
@@ -645,7 +645,7 @@ Used for browser and worker
       @server.listen @port
 
 
-#IO Module
+# IO Module
 
     IO =
      addPort: (name, port) ->
