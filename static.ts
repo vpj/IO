@@ -1,4 +1,3 @@
-import { NodeHttpServerPort } from "./io_node"
 import * as URL from "url"
 import * as PATH from "path"
 import * as FS from "fs"
@@ -64,7 +63,7 @@ export class StaticServer {
         return true
     }
 
-    private serveStatic(path: string, req: HTTP.IncomingMessage, res: HTTP.ServerResponse) {
+    private serveStatic(path: string, res: HTTP.ServerResponse) {
         if ((path.indexOf('/')) === 0) {
             path = path.substr('/'.length);
         }
@@ -107,7 +106,7 @@ export class StaticServer {
             return true
         }
 
-        this.serveStatic(path, req, res)
+        this.serveStatic(path, res)
 
         return true
     }
