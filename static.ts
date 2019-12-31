@@ -45,7 +45,6 @@ export class StaticServer {
     }
 
     private invokeHandler(path: string, req: HTTP.IncomingMessage, res: HTTP.ServerResponse): boolean {
-        console.log(path, this.handlers)
         if (!(path in this.handlers)) {
             return false;
         }
@@ -80,7 +79,6 @@ export class StaticServer {
             path = 'index.html';
         }
 
-        // console.log(path)
         let ext = PATH.extname(path);
         path = PATH.join('/Users/varuna/ml/annotate/ui/out', path);
         FS.readFile(path, function (err, content) {
