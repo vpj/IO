@@ -29,9 +29,9 @@ interface Handler {
 }
 
 export class StaticServer {
-    staticPath: string
-    ignore: Set<string>
-    handlers: { [pathname: string]: Handler }
+    private staticPath: string
+    private ignore: Set<string>
+    private handlers: { [pathname: string]: Handler }
 
     constructor(staticPath: string, ignore: Set<string>) {
         this.staticPath = staticPath
@@ -79,7 +79,7 @@ export class StaticServer {
         }
 
         let ext = PATH.extname(path);
-        path = PATH.join('/Users/varuna/ml/annotate/ui/out', path);
+        path = PATH.join(this.staticPath, path);
         FS.readFile(path, function (err, content) {
             if (err != null) {
                 res.writeHead(404)
