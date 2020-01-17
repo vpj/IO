@@ -49,9 +49,8 @@ export class StaticServer {
         }
 
         let handler = this.handlers[path]
-        let promise = handler(req)
 
-        promise.then((content) => {
+        handler(req).then((content) => {
             res.writeHead(200, {
                 'Content-Type': content.contentType,
                 'Content-Length': Buffer.byteLength(content.contentString, 'utf8')
