@@ -1,7 +1,7 @@
-import * as URL from "url"
-import * as PATH from "path"
-import * as FS from "fs"
-import * as HTTP from "http"
+import * as URL from 'url'
+import * as PATH from 'path'
+import * as FS from 'fs'
+import * as HTTP from 'http'
 
 let CONTENT_TYPES = {
     '.js': 'text/javascript',
@@ -13,10 +13,8 @@ let CONTENT_TYPES = {
 
 function getContentType(ext: string) {
     let type = CONTENT_TYPES[ext]
-    if (type == null)
-        return 'text/plain'
-    else
-        return type
+    if (type == null) return 'text/plain'
+    else return type
 }
 
 interface Content {
@@ -43,18 +41,25 @@ export class StaticServer {
         this.handlers[pathname] = callback
     }
 
-    private invokeHandler(path: string, req: HTTP.IncomingMessage, res: HTTP.ServerResponse): boolean {
+    private invokeHandler(
+        path: string,
+        req: HTTP.IncomingMessage,
+        res: HTTP.ServerResponse
+    ): boolean {
         if (!(path in this.handlers)) {
-            return false;
+            return false
         }
 
         let handler = this.handlers[path]
 
-        handler(req).then((content) => {
+        handler(req).then(content => {
             res.writeHead(200, {
                 'Content-Type': content.contentType,
-                'Content-Length': Buffer.byteLength(content.contentString, 'utf8')
-            });
+                'Content-Length': Buffer.byteLength(
+                    content.contentString,
+                    'utf8'
+                )
+            })
             res.write(content.contentString)
             res.end()
         })
@@ -63,8 +68,8 @@ export class StaticServer {
     }
 
     private serveStatic(path: string, res: HTTP.ServerResponse) {
-        if ((path.indexOf('/')) === 0) {
-            path = path.substr('/'.length);
+        if (path.indexOf('/') === 0) {
+            path = path.substr('/'.length)
         }
 
         if (path.length > 0 && path[0] === '.') {
@@ -74,12 +79,12 @@ export class StaticServer {
         }
 
         if (path === '' || PATH.extname(path) == '') {
-            path = 'index.html';
+            path = 'index.html'
         }
 
-        let ext = PATH.extname(path);
-        path = PATH.join(this.staticPath, path);
-        FS.readFile(path, function (err, content) {
+        let ext = PATH.extname(path)
+        path = PATH.join(this.staticPath, path)
+        FS.readFile(path, function(err, content) {
             if (err != null) {
                 res.writeHead(404)
                 res.end()
@@ -87,15 +92,15 @@ export class StaticServer {
                 res.writeHead(200, {
                     'Content-Type': getContentType(ext),
                     'Content-Length': content.length
-                });
-                return res.end(content, 'utf-8');
+                })
+                return res.end(content, 'utf-8')
             }
         })
     }
 
     handleRequest = (req: HTTP.IncomingMessage, res: HTTP.ServerResponse) => {
         let url = URL.parse(req.url)
-        let path = url.pathname;
+        let path = url.pathname
 
         if (this.ignore.has(path)) {
             return false

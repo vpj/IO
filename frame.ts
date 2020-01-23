@@ -1,34 +1,39 @@
-
 import {
-    Port, 
-    PacketList, ResponsePacket, CallPacket, PortOptions,
-    SimpleCallback,
-} from "./io"
+    Port,
+    PacketList,
+    ResponsePacket,
+    CallPacket,
+    PortOptions,
+    SimpleCallback
+} from './io'
 
 class FramePort extends Port {
     source: Window
     dest: Window
 
     constructor(source: Window, dest: Window) {
-        super();
-        this.source = source;
-        this.dest = dest;
-        this.source.addEventListener('message', this._onMessage.bind(this));
+        super()
+        this.source = source
+        this.dest = dest
+        this.source.addEventListener('message', this._onMessage.bind(this))
     }
 
     _send(data: CallPacket) {
-        return this.dest.postMessage(data, '*');
+        return this.dest.postMessage(data, '*')
     }
 
-    _respond(data: ResponsePacket | PacketList, portOptions: PortOptions, callback: SimpleCallback) {
-        this.dest.postMessage(data, '*');
-        return typeof callback === "function" ? callback() : void 0;
+    _respond(
+        data: ResponsePacket | PacketList,
+        portOptions: PortOptions,
+        callback: SimpleCallback
+    ) {
+        this.dest.postMessage(data, '*')
+        return typeof callback === 'function' ? callback() : void 0
     }
 
     _onMessage(e) {
-        return this._handleMessage(e.data);
+        return this._handleMessage(e.data)
     }
-
-};
+}
 
 export { FramePort }
